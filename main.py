@@ -1,61 +1,124 @@
+import soundfile as sf
 import numpy as np
+import csv
+import time
+import random
 import threading
-import librosa
+import datetime
+import argparse
+import matplotlib.pyplot as plt
+from concurrent.futures import ThreadPoolExecutor
 
-# Define the number of bins (equal to the number of motors)
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description='Plot data from a CSV file.')
+parser.add_argument('filename', type=str, help='The name of the CSV file.')
+args = parser.parse_args()
+
+filename=args.filename
+
+# Function to control a motor and write data to a CSV file
+sample_rate = 44100  # Assuming a sample rate of 44100 Hz
+chunk_duration = 0.016  # 16 milliseconds
 num_bins = 4
 
-# Define the sample rate and duration for audio recording
-sample_rate = 44100  # Standard for most microphones
-duration = 1.0  # Duration in seconds
+# matplotlib stuff
+fig, ax = plt.subplots()
+
+# Create a line object for the plot
+line, = ax.plot([], [], lw=2)
+
+# Set the plot limits
+ax.set_ylim(-1, 2)  # Adjust this to match the range of your data
+ax.set_xlim(0, num_bins)  # Adjust this to match the range of your data
+
+# Set the plot labels
+ax.set_xlabel('Bin')
+ax.set_ylabel('Intensity')
+ax.set_title(filename)
+
+# Show the plot in interactive mode
+plt.ion()
+plt.show()
+# Define the maximum window size
+window_size = 1000  # Adjust this to your preference
+
+# Create a list to store the data points
+data_points = []
+# Create a list of line objects
+lines = [ax.plot([], [], lw=2)[0] for _ in range(num_bins)]
+
+
+executor = ThreadPoolExecutor(max_workers=50)
+#control motor
+def control_motor(motor_number, intensity):
+    intensity = format(intensity*100, ".2f")
+    print(f"Motor {motor_number} vibration intensity {intensity}")    
 
 # Function to read audio data from a music file in chunks
-def read_audio_data(file_path, chunk_size, overlap):
-    audio_data, sample_rate = librosa.load(file_path, sr=None, mono=True)
-    hop_size = chunk_size - overlap
-    num_chunks = (len(audio_data) - overlap) // hop_size
-    for i in range(num_chunks):
-        start = i * hop_size
-        end = start + chunk_size
-        yield audio_data[start:end], sample_rate
+def read_audio_data(file_path, chunk_size):
+    with sf.SoundFile(file_path) as audio_file:
+        while True:
+            audio_data = audio_file.read(chunk_size)
+            if len(audio_data) == 0:
+                break
+            yield audio_data, audio_file.samplerate
 
-# Function to apply Fourier Transform
+# Function to apply Fourier Transform and plot it
 def apply_fourier_transform(audio_data):
-    frequencies = np.fft.rfftfreq(len(audio_data), 1.0 / sample_rate)
     amplitudes = np.abs(np.fft.rfft(audio_data))
+    frequencies = np.fft.rfftfreq(len(amplitudes), 1.0 / sample_rate)
     return frequencies, amplitudes
 
-# Function to control a motor
-def control_motor(motor_number, intensity):
-    # Replace this with your own function to control the motors
-    print(f"Motor {motor_number} vibrating with intensity {intensity}")
-
+plot_thread = None  # Define plot_thread outside the function
 # Function to perform binning and map bins to motors
 def bin_and_map(frequencies, amplitudes, num_bins):
+    global plot_thread
     bin_edges = np.linspace(frequencies.min(), frequencies.max(), num_bins + 1)
     bins = np.digitize(frequencies, bin_edges)
     threads = []
+    intensities = np.zeros(num_bins)  # Create an array to store the intensities
     for i in range(num_bins):
-        bin_amplitudes = amplitudes[bins == i]
+        indices = np.where(bins == i+1)[0]  # Get the indices of frequencies in this bin
+        bin_amplitudes = amplitudes[indices]  # Get the corresponding amplitudes
         if bin_amplitudes.size > 0:
             intensity = bin_amplitudes.max() / amplitudes.max()
+            intensities[i] = intensity  # Store the intensity
             # Create a new thread for each motor control call
-            thread = threading.Thread(target=control_motor, args=(i, intensity))
-            threads.append(thread)
-            thread.start()
+            # thread = threading.Thread(target=control_motor, args=(i, intensity))
+            # threads.append(thread)
+            # thread.start()
+            executor.submit(control_motor, i, intensity)
+    # Add the new data point to the list
+    data_points.append(intensities)
+    # Remove old data points if the window size is exceeded
+    if len(data_points) > 20:
+        data_points.pop(0)
+     # Create a new thread for the plotting operation if one isn't already running
+    # if plot_thread is None or not plot_thread.is_alive():
+        # plot_thread = threading.Thread(target=update_plot, args=(data_points, lines))
+        # plot_thread.start()
     # Wait for all threads to complete
-    for thread in threads:
-        thread.join()
+    # for thread in threads:
+    #     thread.join()
+    # plot_thread.join()
+
+# Function to update the plot
+def update_plot(data_points, lines):
+    # Update each line object
+    for i, line in enumerate(lines):
+        line.set_ydata([point[i] for point in data_points])
+        line.set_xdata(range(len(data_points)))
+    # Update the x-axis limit
+    ax.set_xlim(0, len(data_points))
+    plt.draw()
+    plt.pause(0.01)
 
 # Main loop
-for audio_chunk in read_audio_data('path_to_your_music_file.mp3', chunk_size=44100, overlap=22050):
-    # Read a chunk of audio data from a music file
+chunk_size = int(sample_rate * chunk_duration)  # Calculate the chunk size
+volume = 1  # Set the volume to 100%
+for audio_chunk in read_audio_data(f'./sample/{filename}.mp3', chunk_size):
     audio_data, sample_rate = audio_chunk
-
-    # Apply Fourier Transform
+    audio_data *= volume  # Adjust the volume
     frequencies, amplitudes = apply_fourier_transform(audio_data)
-
-    # Perform binning and map bins to motors
     bin_and_map(frequencies, amplitudes, num_bins)
-
-
+    time.sleep(chunk_duration)  # Wait for the duration of the audio chunk
