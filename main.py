@@ -49,13 +49,31 @@ parser.add_argument(
   required=True,
   choices=range(1, 101)
 )
+
+parser.add_argument(
+  '-s', 
+  '--samplerate', 
+  type=int, 
+  help='Sample rate.',
+  required=False,
+  default=44100
+)
+
+parser.add_argument(
+  '-t', 
+  '--time', 
+  type=float, 
+  help='Duration of chunk to read. Default is 16 ms',
+  required=False,
+  default=0.016
+)
 args = parser.parse_args()
 
 filename=args.filename
 
 # Function to control a motor and write data to a CSV file
-sample_rate = 44100  # Assuming a sample rate of 44100 Hz
-chunk_duration = 0.016 # 16 milliseconds
+sample_rate = args.samplerate  # Assuming a sample rate of 44100 Hz
+chunk_duration = args.time # 16 milliseconds
 num_bins = args.bins
 
 # matplotlib stuff
