@@ -40,6 +40,15 @@ parser.add_argument(
   help='Number of bins',
   required=True
 )
+
+parser.add_argument(
+  '-v', 
+  '--volume', 
+  type=int, 
+  help='Volume. Value from 0 - 100',
+  required=True,
+  choices=range(1, 101)
+)
 args = parser.parse_args()
 
 filename=args.filename
@@ -131,10 +140,10 @@ def update_plot(data_points, lines):
 
 # Main loop
 chunk_size = int(sample_rate * chunk_duration)  # Calculate the chunk size
-volume = 1  # Set the volume to 100%
+volume = args.volume # Set the volume to 100%
 for audio_chunk in read_audio_data(f'./sample/{filename}', chunk_size):
     audio_data, sample_rate = audio_chunk
-    audio_data *= volume  # Adjust the volume
+    audio_data = audio_data * (args.volume/100)  # Adjust the volume
     frequencies, amplitudes = apply_fourier_transform(audio_data)
     bin_and_map(frequencies, amplitudes, num_bins)
     # Check the queue for new data
