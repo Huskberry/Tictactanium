@@ -15,8 +15,21 @@ import queue
 data_queue = queue.Queue()
 
 # Parse command-line arguments
-parser = argparse.ArgumentParser(description='Plot data from a CSV file.')
-parser.add_argument('filename', type=str, help='The name of the CSV file.')
+parser = argparse.ArgumentParser(description='Audio processing to vibration motors')
+parser.add_argument(
+  '-f',
+  '--filename', 
+  type=str,
+  help='The name of the audio file.',
+  required=True
+)
+parser.add_argument(
+  '-p', 
+  '--plot', 
+  type=bool, 
+  help='whether to plot a graph',
+  default=False
+)
 args = parser.parse_args()
 
 filename=args.filename
@@ -123,6 +136,7 @@ for audio_chunk in read_audio_data(f'./sample/{filename}', chunk_size):
         if len(data_points) > 20:
             data_points.pop(0)
         # Update the plot
-        update_plot(data_points, lines)
+        if args.plot:
+          update_plot(data_points, lines)
     
     time.sleep(chunk_duration)  # Wait for the duration of the audio chunk
