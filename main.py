@@ -6,8 +6,13 @@ import random
 import threading
 import datetime
 import argparse
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from concurrent.futures import ThreadPoolExecutor
+import queue
+
+data_queue = queue.Queue()
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Plot data from a CSV file.')
@@ -83,24 +88,11 @@ def bin_and_map(frequencies, amplitudes, num_bins):
         if bin_amplitudes.size > 0:
             intensity = bin_amplitudes.max() / amplitudes.max()
             intensities[i] = intensity  # Store the intensity
-            # Create a new thread for each motor control call
-            # thread = threading.Thread(target=control_motor, args=(i, intensity))
-            # threads.append(thread)
-            # thread.start()
             executor.submit(control_motor, i, intensity)
-    # Add the new data point to the list
-    data_points.append(intensities)
+    data_queue.put(intensities)
     # Remove old data points if the window size is exceeded
     if len(data_points) > 20:
         data_points.pop(0)
-     # Create a new thread for the plotting operation if one isn't already running
-    # if plot_thread is None or not plot_thread.is_alive():
-        # plot_thread = threading.Thread(target=update_plot, args=(data_points, lines))
-        # plot_thread.start()
-    # Wait for all threads to complete
-    # for thread in threads:
-    #     thread.join()
-    # plot_thread.join()
 
 # Function to update the plot
 def update_plot(data_points, lines):
@@ -116,9 +108,20 @@ def update_plot(data_points, lines):
 # Main loop
 chunk_size = int(sample_rate * chunk_duration)  # Calculate the chunk size
 volume = 1  # Set the volume to 100%
-for audio_chunk in read_audio_data(f'./sample/{filename}.mp3', chunk_size):
+for audio_chunk in read_audio_data(f'./sample/{filename}', chunk_size):
     audio_data, sample_rate = audio_chunk
     audio_data *= volume  # Adjust the volume
     frequencies, amplitudes = apply_fourier_transform(audio_data)
     bin_and_map(frequencies, amplitudes, num_bins)
+    # Check the queue for new data
+    while not data_queue.empty():
+        intensities = data_queue.get()
+        # Add the new data point to the list
+        data_points.append(intensities)
+        # Remove old data points if the window size is exceeded
+        if len(data_points) > 20:
+            data_points.pop(0)
+        # Update the plot
+        update_plot(data_points, lines)
+    
     time.sleep(chunk_duration)  # Wait for the duration of the audio chunk
