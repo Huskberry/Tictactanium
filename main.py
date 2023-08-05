@@ -23,7 +23,7 @@ filename=args.filename
 
 # Function to control a motor and write data to a CSV file
 sample_rate = 44100  # Assuming a sample rate of 44100 Hz
-chunk_duration = 2 # 16 milliseconds
+chunk_duration = 0.016 # 16 milliseconds
 num_bins = 4
 
 # matplotlib stuff
@@ -85,13 +85,11 @@ def bin_and_map(frequencies, amplitudes, num_bins):
     for i in range(num_bins):
         indices = np.where(bins == i+1)[0]  # Get the indices of frequencies in this bin
         bin_amplitudes = amplitudes[indices]  # Get the corresponding amplitudes
-        if bin_amplitudes.size > 0:
-          try:
-            intensity = bin_amplitudes.max() / amplitudes.max()
-            intensities[i] = intensity  # Store the intensity
-            executor.submit(control_motor, i, intensity)
-          except:
-            continue
+        if bin_amplitudes.size > 0 and amplitudes.max() > 0:
+          intensity = bin_amplitudes.max() / amplitudes.max()
+          intensities[i] = intensity  # Store the intensity
+          executor.submit(control_motor, i, intensity)
+
     data_queue.put(intensities)
     # Remove old data points if the window size is exceeded
     if len(data_points) > 20:
