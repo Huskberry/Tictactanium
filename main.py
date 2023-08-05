@@ -23,12 +23,22 @@ parser.add_argument(
   help='The name of the audio file.',
   required=True
 )
+
 parser.add_argument(
   '-p', 
   '--plot', 
   type=bool, 
-  help='whether to plot a graph',
-  default=False
+  help='Whether to plot a graph. Default: False',
+  default=False,
+  required=False
+)
+
+parser.add_argument(
+  '-b', 
+  '--bins', 
+  type=int, 
+  help='Number of bins',
+  required=True
 )
 args = parser.parse_args()
 
@@ -37,7 +47,7 @@ filename=args.filename
 # Function to control a motor and write data to a CSV file
 sample_rate = 44100  # Assuming a sample rate of 44100 Hz
 chunk_duration = 0.016 # 16 milliseconds
-num_bins = 4
+num_bins = args.bins
 
 # matplotlib stuff
 fig, ax = plt.subplots()
