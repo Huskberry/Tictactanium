@@ -23,7 +23,7 @@ filename=args.filename
 
 # Function to control a motor and write data to a CSV file
 sample_rate = 44100  # Assuming a sample rate of 44100 Hz
-chunk_duration = 0.016  # 16 milliseconds
+chunk_duration = 2 # 16 milliseconds
 num_bins = 4
 
 # matplotlib stuff
@@ -33,7 +33,7 @@ fig, ax = plt.subplots()
 line, = ax.plot([], [], lw=2)
 
 # Set the plot limits
-ax.set_ylim(-1, 2)  # Adjust this to match the range of your data
+ax.set_ylim(-0.5, 1.5)  # Adjust this to match the range of your data
 ax.set_xlim(0, num_bins)  # Adjust this to match the range of your data
 
 # Set the plot labels
@@ -57,7 +57,7 @@ executor = ThreadPoolExecutor(max_workers=50)
 #control motor
 def control_motor(motor_number, intensity):
     intensity = format(intensity*100, ".2f")
-    print(f"Motor {motor_number} vibration intensity {intensity}")    
+    print(f"Motor {motor_number} vibration intensity {intensity}")
 
 # Function to read audio data from a music file in chunks
 def read_audio_data(file_path, chunk_size):
@@ -86,9 +86,12 @@ def bin_and_map(frequencies, amplitudes, num_bins):
         indices = np.where(bins == i+1)[0]  # Get the indices of frequencies in this bin
         bin_amplitudes = amplitudes[indices]  # Get the corresponding amplitudes
         if bin_amplitudes.size > 0:
+          try:
             intensity = bin_amplitudes.max() / amplitudes.max()
             intensities[i] = intensity  # Store the intensity
             executor.submit(control_motor, i, intensity)
+          except:
+            continue
     data_queue.put(intensities)
     # Remove old data points if the window size is exceeded
     if len(data_points) > 20:
