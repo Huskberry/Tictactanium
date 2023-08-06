@@ -47,8 +47,9 @@ parser.add_argument(
   '--volume', 
   type=int, 
   help='Volume. Value from 0 - 100',
-  required=True,
-  choices=range(1, 101)
+  required=False,
+  choices=range(1, 101),
+  default=100
 )
 
 parser.add_argument(
