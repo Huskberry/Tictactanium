@@ -11,6 +11,7 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from concurrent.futures import ThreadPoolExecutor
 import queue
+import RPi.GPIO as GPIO
 
 data_queue = queue.Queue()
 
@@ -104,10 +105,24 @@ lines = [ax.plot([], [], lw=2)[0] for _ in range(num_bins)]
 
 
 executor = ThreadPoolExecutor(max_workers=50)
+
+# Setup
+GPIO.setmode(GPIO.BCM)  # Use BCM numbering for GPIO pins
+motor_pins = [17, 18, 22, 23, 24, 25, 26, 27]  # Replace with your GPIO pin numbers
+for pin in motor_pins:
+    GPIO.setup(pin, GPIO.OUT)
+    GPIO.output(pin, GPIO.LOW)
+
+# Create PWM instances for each pin with a frequency of 100Hz (this can be adjusted)
+pwms = [GPIO.PWM(pin, 100) for pin in motor_pins]
+for pwm in pwms:
+    pwm.start(0)  # Start with duty cycle of 0%
+
 #control motor
 def control_motor(motor_number, intensity):
     intensity = format(intensity*100, ".2f")
     print(f"Motor {motor_number} vibration intensity {intensity}")
+    pwms[motor_number].ChangeDutyCycle(duty_cycle)
 
 # Function to read audio data from a music file in chunks
 def read_audio_data(file_path, chunk_size):
@@ -177,3 +192,5 @@ for audio_chunk in read_audio_data(f'./sample/{filename}', chunk_size):
           update_plot(data_points, lines)
     
     time.sleep(chunk_duration)  # Wait for the duration of the audio chunk
+# Remember to cleanup GPIO settings after use
+GPIO.cleanup()
