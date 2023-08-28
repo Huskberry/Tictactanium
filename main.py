@@ -1,10 +1,6 @@
 import soundfile as sf
 import numpy as np
-import csv
 import time
-import random
-import threading
-import datetime
 import argparse
 import matplotlib
 matplotlib.use('TkAgg')
@@ -12,6 +8,7 @@ import matplotlib.pyplot as plt
 from concurrent.futures import ThreadPoolExecutor
 import queue
 import RPi.GPIO as GPIO
+import sounddevice as sd
 
 data_queue = queue.Queue()
 
@@ -79,53 +76,54 @@ chunk_duration = args.time # 16 milliseconds
 num_bins = args.bins
 
 # matplotlib stuff
-fig, ax = plt.subplots()
+# fig, ax = plt.subplots()
 
 # Create a line object for the plot
-line, = ax.plot([], [], lw=2)
+# line, = ax.plot([], [], lw=2)
 
-# Set the plot limits
-ax.set_ylim(-0.5, 1.5)  # Adjust this to match the range of your data
-ax.set_xlim(0, num_bins)  # Adjust this to match the range of your data
+# # Set the plot limits
+# ax.set_ylim(-0.5, 1.5)  # Adjust this to match the range of your data
+# ax.set_xlim(0, num_bins)  # Adjust this to match the range of your data
 
-# Set the plot labels
-ax.set_xlabel('Bin')
-ax.set_ylabel('Intensity')
-ax.set_title(filename)
+# # Set the plot labels
+# ax.set_xlabel('Bin')
+# ax.set_ylabel('Intensity')
+# ax.set_title(filename)
 
-# Show the plot in interactive mode
-plt.ion()
-plt.show()
-# Define the maximum window size
-window_size = 1000  # Adjust this to your preference
+# # Show the plot in interactive mode
+# plt.ion()
+# plt.show()
+# # Define the maximum window size
+# window_size = 1000  # Adjust this to your preference
 
-# Create a list to store the data points
+# # Create a list to store the data points
 data_points = []
-# Create a list of line objects
-lines = [ax.plot([], [], lw=2)[0] for _ in range(num_bins)]
+# # Create a list of line objects
+# lines = [ax.plot([], [], lw=2)[0] for _ in range(num_bins)]
 
 
 executor = ThreadPoolExecutor(max_workers=50)
 
+pwms = []
 # Setup
 GPIO.setmode(GPIO.BCM)  # Use BCM numbering for GPIO pins
-motor_pins = [17, 18, 22, 23, 24, 25, 26, 27]  # Replace with your GPIO pin numbers
+motor_pins = [17, 22, 23, 27]  # Replace with your GPIO pin numbers
 for pin in motor_pins:
     GPIO.setup(pin, GPIO.OUT)
-    GPIO.output(pin, GPIO.LOW)
+    # GPIO.output(pin, GPIO.LOW)
+    pwm = GPIO.PWM(pin, 100)
+    pwm.start(0)  # Start with a duty cycle of 0%
+    pwms.append(pwm)
 
-# Create PWM instances for each pin with a frequency of 100Hz (this can be adjusted)
-pwms = [GPIO.PWM(pin, 100) for pin in motor_pins]
-for pwm in pwms:
-    pwm.start(0)  # Start with duty cycle of 0%
+print(pwms[3])
 
 #control motor
 def control_motor(motor_number, intensity):
-    intensity = format(intensity*100, ".2f")
-    print(f"Motor {motor_number} vibration intensity {intensity}")
-    pwms[motor_number].ChangeDutyCycle(duty_cycle)
+    intensity = float(format(intensity * 100, ".0f"))
+    # print(f"Motor {motor_number} vibration intensity {intensity}")
+    pwms[motor_number].ChangeDutyCycle(intensity)
 
-# Function to read audio data from a music file in chunks
+# Function to read audio dkata from a music file in chunks
 def read_audio_data(file_path, chunk_size):
     with sf.SoundFile(file_path) as audio_file:
         while True:
@@ -158,40 +156,47 @@ def bin_and_map(frequencies, amplitudes, num_bins):
 
     data_queue.put(intensities)
     # Remove old data points if the window size is exceeded
-    if len(data_points) > 20:
-        data_points.pop(0)
+    # if len(data_points) > 20:
+    #     data_points.pop(0)
 
 # Function to update the plot
-def update_plot(data_points, lines):
-    # Update each line object
-    for i, line in enumerate(lines):
-        line.set_ydata([point[i] for point in data_points])
-        line.set_xdata(range(len(data_points)))
-    # Update the x-axis limit
-    ax.set_xlim(0, len(data_points))
-    plt.draw()
-    plt.pause(0.01)
+# def update_plot(data_points, lines):
+    # # Update each line object
+    # for i, line in enumerate(lines):
+    #     line.set_ydata([point[i] for point in data_points])
+    #     line.set_xdata(range(len(data_points)))
+    # # Update the x-axis limit
+    # ax.set_xlim(0, len(data_points))
+    # plt.draw()
+    # plt.pause(0.01)
 
 # Main loop
 chunk_size = int(sample_rate * chunk_duration)  # Calculate the chunk size
 volume = args.volume # Set the volume to 100%
-for audio_chunk in read_audio_data(f'./sample/{filename}', chunk_size):
-    audio_data, sample_rate = audio_chunk
-    audio_data = audio_data * (args.volume/100)  # Adjust the volume
-    frequencies, amplitudes = apply_fourier_transform(audio_data)
-    bin_and_map(frequencies, amplitudes, num_bins)
-    # Check the queue for new data
-    while not data_queue.empty():
-        intensities = data_queue.get()
-        # Add the new data point to the list
-        data_points.append(intensities)
-        # Remove old data points if the window size is exceeded
-        if len(data_points) > 20:
-            data_points.pop(0)
-        # Update the plot
-        if args.plot:
-          update_plot(data_points, lines)
-    
-    time.sleep(chunk_duration)  # Wait for the duration of the audio chunk
-# Remember to cleanup GPIO settings after use
-GPIO.cleanup()
+try:
+  for audio_chunk in read_audio_data(f'./piper/output/{filename}', chunk_size):
+      audio_data, sample_rate = audio_chunk
+      audio_data = audio_data * (args.volume/100)  # Adjust the volume
+      sd.play(audio_data, samplerate=sample_rate, blocksize=1024)
+      frequencies, amplitudes = apply_fourier_transform(audio_data)
+      bin_and_map(frequencies, amplitudes, num_bins)
+      # # Check the queue for new data
+      # while not data_queue.empty():
+      #     intensities = data_queue.get()
+      #     # Add the new data point to the list
+      #     data_points.append(intensities)
+      #     # Remove old data points if the window size is exceeded
+      #     if len(data_points) > 20:
+      #         data_points.pop(0)
+      #     # Update the plot
+      #     # if args.plot:
+      #     #   update_plot(data_points, lines)
+      
+      time.sleep(chunk_duration)  # Wait for the duration of the audio chunk
+  # Remember to cleanup GPIO settings after use
+except KeyboardInterrupt:
+    pass
+finally:  
+    for pwm in pwms:
+        pwm.stop()
+    GPIO.cleanup()
