@@ -1,0 +1,4 @@
+soundfile
+datetime
+matplotlib
+pyaudio
