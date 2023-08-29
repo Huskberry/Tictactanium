@@ -2,4 +2,6 @@
 *.wav
 *.csv
 *.png
-piper/*
+piper/
+.venv/
+.vscode/
