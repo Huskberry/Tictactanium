@@ -223,5 +223,5 @@ finally:
     for pwm in pwms:
         pwm.stop()
     GPIO.cleanup()
-		audio_queue.put(None)
+    audio_queue.put(None)
     audio_thread.join()
