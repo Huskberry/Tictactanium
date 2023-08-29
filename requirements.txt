@@ -2,3 +2,4 @@ soundfile
 datetime
 matplotlib
 pyaudio
+sounddevice
