@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 import queue
 import RPi.GPIO as GPIO
 import sounddevice as sd
+from threading import Thread
 
 data_queue = queue.Queue()
 
@@ -64,7 +65,16 @@ parser.add_argument(
   type=float, 
   help='Duration of chunk to read. Default is 16 ms',
   required=False,
-  default=0.016
+  default=0.3
+)
+
+parser.add_argument(
+  '-o', 
+  '--output', 
+  type=bool, 
+  help='Whether to output the sound',
+  required=False,
+  default=False
 )
 args = parser.parse_args()
 
@@ -168,6 +178,20 @@ def bin_and_map(frequencies, amplitudes, num_bins):
     # plt.draw()
     # plt.pause(0.01)
 
+audio_queue = queue.Queue()
+# Function to play audio from the queue
+def play_audio_from_queue():
+    while True:
+        audio_chunk = audio_queue.get()
+        if audio_chunk is None:
+            break
+        sd.play(audio_chunk, samplerate=sample_rate, blocksize=1024)
+        sd.wait()
+
+# Start the audio playback thread
+audio_thread = Thread(target=play_audio_from_queue)
+audio_thread.start()
+
 # Main loop
 chunk_size = int(sample_rate * chunk_duration)  # Calculate the chunk size
 volume = args.volume # Set the volume to 100%
@@ -175,7 +199,8 @@ try:
   for audio_chunk in read_audio_data(f'./piper/output/{filename}', chunk_size):
       audio_data, sample_rate = audio_chunk
       audio_data = audio_data * (args.volume/100)  # Adjust the volume
-      sd.play(audio_data, samplerate=sample_rate, blocksize=1024)
+      if args.output:
+          audio_queue.put(audio_data)
       frequencies, amplitudes = apply_fourier_transform(audio_data)
       bin_and_map(frequencies, amplitudes, num_bins)
       # # Check the queue for new data
@@ -198,3 +223,5 @@ finally:
     for pwm in pwms:
         pwm.stop()
     GPIO.cleanup()
+		audio_queue.put(None)
+    audio_thread.join()
