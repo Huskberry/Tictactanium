@@ -110,12 +110,10 @@ GPIO.setmode(GPIO.BCM)  # Use BCM numbering for GPIO pins
 motor_pins = [17, 22, 23, 27]  # Replace with your GPIO pin numbers
 for pin in motor_pins:
     GPIO.setup(pin, GPIO.OUT)
-    # GPIO.output(pin, GPIO.LOW)
+    GPIO.output(pin, GPIO.LOW)
     pwm = GPIO.PWM(pin, 100)
     pwm.start(0)  # Start with a duty cycle of 0%
     pwms.append(pwm)
-
-print(pwms[3])
 
 #control motor
 def control_motor(motor_number, intensity):
