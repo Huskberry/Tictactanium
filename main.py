@@ -4,14 +4,11 @@ import time
 import argparse
 import matplotlib
 matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 from concurrent.futures import ThreadPoolExecutor
 import queue
 import RPi.GPIO as GPIO
 import sounddevice as sd
 from threading import Thread
-
-data_queue = queue.Queue()
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Audio processing to vibration motors')
@@ -51,15 +48,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-  '-s', 
-  '--samplerate', 
-  type=int, 
-  help='Sample rate.',
-  required=False,
-  default=44100
-)
-
-parser.add_argument(
   '-t', 
   '--time', 
   type=float, 
@@ -81,37 +69,8 @@ args = parser.parse_args()
 filename=args.filename
 
 # Function to control a motor and write data to a CSV file
-sample_rate = args.samplerate  # Assuming a sample rate of 44100 Hz
 chunk_duration = args.time # 16 milliseconds
 num_bins = args.bins
-
-# matplotlib stuff
-# fig, ax = plt.subplots()
-
-# Create a line object for the plot
-# line, = ax.plot([], [], lw=2)
-
-# # Set the plot limits
-# ax.set_ylim(-0.5, 1.5)  # Adjust this to match the range of your data
-# ax.set_xlim(0, num_bins)  # Adjust this to match the range of your data
-
-# # Set the plot labels
-# ax.set_xlabel('Bin')
-# ax.set_ylabel('Intensity')
-# ax.set_title(filename)
-
-# # Show the plot in interactive mode
-# plt.ion()
-# plt.show()
-# # Define the maximum window size
-# window_size = 1000  # Adjust this to your preference
-
-# # Create a list to store the data points
-data_points = []
-# # Create a list of line objects
-# lines = [ax.plot([], [], lw=2)[0] for _ in range(num_bins)]
-
-
 executor = ThreadPoolExecutor(max_workers=50)
 
 pwms = []
@@ -128,17 +87,27 @@ for pin in motor_pins:
 #control motor
 def control_motor(motor_number, intensity):
     intensity = float(format(intensity * 100, ".0f"))
-    # print(f"Motor {motor_number} vibration intensity {intensity}")
+    print(f"Motor {motor_number} vibration intensity {intensity}")
     pwms[motor_number].ChangeDutyCycle(intensity)
 
-# Function to read audio dkata from a music file in chunks
+# Function to read audio data from a music file in chunks
 def read_audio_data(file_path, chunk_size):
     with sf.SoundFile(file_path) as audio_file:
+        # If chunk_size is None, calculate it based on the sample_rate from the file
+        if chunk_size is None:
+            chunk_size = int(audio_file.samplerate * chunk_duration)
+
         while True:
             audio_data = audio_file.read(chunk_size)
             if len(audio_data) == 0:
                 break
-            yield audio_data, audio_file.samplerate
+            yield audio_data
+
+def get_sample_rate(file_path):
+    with sf.SoundFile(file_path) as audio_file:
+        return audio_file.samplerate
+
+sample_rate = get_sample_rate(f'./piper/output/{filename}')
 
 # Function to apply Fourier Transform and plot it
 def apply_fourier_transform(audio_data):
@@ -162,21 +131,6 @@ def bin_and_map(frequencies, amplitudes, num_bins):
           intensities[i] = intensity  # Store the intensity
           executor.submit(control_motor, i, intensity)
 
-    data_queue.put(intensities)
-    # Remove old data points if the window size is exceeded
-    # if len(data_points) > 20:
-    #     data_points.pop(0)
-
-# Function to update the plot
-# def update_plot(data_points, lines):
-    # # Update each line object
-    # for i, line in enumerate(lines):
-    #     line.set_ydata([point[i] for point in data_points])
-    #     line.set_xdata(range(len(data_points)))
-    # # Update the x-axis limit
-    # ax.set_xlim(0, len(data_points))
-    # plt.draw()
-    # plt.pause(0.01)
 
 audio_queue = queue.Queue()
 # Function to play audio from the queue
@@ -188,34 +142,33 @@ def play_audio_from_queue():
         sd.play(audio_chunk, samplerate=sample_rate, blocksize=1024)
         sd.wait()
 
-# Start the audio playback thread
-audio_thread = Thread(target=play_audio_from_queue)
-audio_thread.start()
+min_chunk_duration = chunk_duration # Minimum chunk duration in seconds
+max_chunk_duration = 0.3
 
 # Main loop
-chunk_size = int(sample_rate * chunk_duration)  # Calculate the chunk size
 volume = args.volume # Set the volume to 100%
 try:
+  # Start the audio playback thread
+  audio_thread = Thread(target=play_audio_from_queue,)
+  audio_thread.start()
+  chunk_size = int(sample_rate * chunk_duration)
+
   for audio_chunk in read_audio_data(f'./piper/output/{filename}', chunk_size):
-      audio_data, sample_rate = audio_chunk
+      start_time = time.time()
+
+      audio_data = audio_chunk
       audio_data = audio_data * (args.volume/100)  # Adjust the volume
+
       if args.output:
           audio_queue.put(audio_data)
+
       frequencies, amplitudes = apply_fourier_transform(audio_data)
       bin_and_map(frequencies, amplitudes, num_bins)
-      # # Check the queue for new data
-      # while not data_queue.empty():
-      #     intensities = data_queue.get()
-      #     # Add the new data point to the list
-      #     data_points.append(intensities)
-      #     # Remove old data points if the window size is exceeded
-      #     if len(data_points) > 20:
-      #         data_points.pop(0)
-      #     # Update the plot
-      #     # if args.plot:
-      #     #   update_plot(data_points, lines)
+      end_time = time.time()
+      processing_time = end_time - start_time
       
       time.sleep(chunk_duration)  # Wait for the duration of the audio chunk
+      chunk_size = int(sample_rate * chunk_duration)
   # Remember to cleanup GPIO settings after use
 except KeyboardInterrupt:
     pass
