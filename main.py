@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import queue
 import RPi.GPIO as GPIO
 import sounddevice as sd
-from threading import Thread
+from threading import Thread, Lock
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Audio processing to vibration motors')
@@ -17,16 +17,8 @@ parser.add_argument(
   '--filename', 
   type=str,
   help='The name of the audio file.',
-  required=True
-)
-
-parser.add_argument(
-  '-p', 
-  '--plot', 
-  type=bool, 
-  help='Whether to plot a graph. Default: False',
-  default=False,
-  required=False
+  required=False,
+  default=''
 )
 
 parser.add_argument(
@@ -53,7 +45,7 @@ parser.add_argument(
   type=float, 
   help='Duration of chunk to read. Default is 16 ms',
   required=False,
-  default=0.3
+  default=0.1
 )
 
 parser.add_argument(
@@ -103,11 +95,13 @@ def read_audio_data(file_path, chunk_size):
                 break
             yield audio_data
 
-def get_sample_rate(file_path):
+def get_sample_rate_from_file(file_path):
     with sf.SoundFile(file_path) as audio_file:
         return audio_file.samplerate
 
-sample_rate = get_sample_rate(f'./piper/output/{filename}')
+def get_sample_rate_from_device(device_index):
+    dev_info = sd.query_devices(device_index)
+    return dev_info['default_samplerate']
 
 # Function to apply Fourier Transform and plot it
 def apply_fourier_transform(audio_data):
@@ -139,11 +133,70 @@ def play_audio_from_queue():
         audio_chunk = audio_queue.get()
         if audio_chunk is None:
             break
-        sd.play(audio_chunk, samplerate=sample_rate, blocksize=1024)
-        sd.wait()
+        try:
+            sd.play(audio_chunk, samplerate=sample_rate, blocksize=4096)
+            sd.wait()
+        except Exception as e:
+            print(f"Audio playback error: {e}")
+
+audio_buffer = np.array([])
+buffer_lock = Lock()
+chunk_duration = 0.1  # 100 ms
+chunk_samples = None
+def callback(indata, frames, time, status):
+    global audio_buffer
+    audio_data = indata[:, 0]
+    # Append incoming audio data to the buffer
+    audio_buffer = np.concatenate((audio_buffer, audio_data))
+    
+    # Check if the buffer has enough data for a chunk
+    while len(audio_buffer) >= chunk_samples:
+        # Extract chunk and remove it from buffer
+        audio_chunk = audio_buffer[:chunk_samples]
+        audio_buffer = audio_buffer[chunk_samples:]
+        
+        # Process the chunk
+        if args.output:
+            audio_queue.put(audio_chunk)
+        
+        frequencies, amplitudes = apply_fourier_transform(audio_chunk)
+        bin_and_map(frequencies, amplitudes, num_bins)
+
+
+
 
 min_chunk_duration = chunk_duration # Minimum chunk duration in seconds
-max_chunk_duration = 0.3
+max_chunk_duration = 0.1
+
+def select_audio_devices():
+    device_count = len(sd.query_devices())
+    print(f"Number of devices: {device_count}")
+    for i in range(device_count):
+        dev = sd.query_devices(i)
+        print(f"{i}: {dev['name']} (Max input channels: {dev['max_input_channels']}, Max output channels: {dev['max_output_channels']})")
+
+    # Select a device for input
+    input_device_index = int(input("Select a device index for input: "))
+    
+    if input_device_index >= device_count:
+        print("Invalid input device index.")
+        return None, None, None
+    
+    # Get sample rate of the selected input device
+    input_dev_info = sd.query_devices(input_device_index)
+    input_sample_rate = input_dev_info['default_samplerate']
+    input_channels = max(1, input_dev_info['max_input_channels'])
+    
+    # Select a device for output
+    output_device_index = int(input("Select a device index for output: "))
+    
+    if output_device_index >= device_count:
+        print("Invalid output device index.")
+        return None, None, None
+
+    return input_device_index, output_device_index, input_sample_rate, input_channels
+
+
 
 # Main loop
 volume = args.volume # Set the volume to 100%
@@ -151,24 +204,40 @@ try:
   # Start the audio playback thread
   audio_thread = Thread(target=play_audio_from_queue,)
   audio_thread.start()
-  chunk_size = int(sample_rate * chunk_duration)
+  if filename:  # If filename is provided, play the audio file
+      sample_rate = get_sample_rate_from_file(f'./piper/output/{filename}')
+      chunk_size = int(sample_rate * chunk_duration)
+      for audio_chunk in read_audio_data(f'./piper/output/{filename}', chunk_size):
+          start_time = time.time()
 
-  for audio_chunk in read_audio_data(f'./piper/output/{filename}', chunk_size):
-      start_time = time.time()
+          audio_data = audio_chunk
+          audio_data = audio_data * (args.volume/100)  # Adjust the volume
 
-      audio_data = audio_chunk
-      audio_data = audio_data * (args.volume/100)  # Adjust the volume
+          if args.output:
+              audio_queue.put(audio_data)
 
-      if args.output:
-          audio_queue.put(audio_data)
+          frequencies, amplitudes = apply_fourier_transform(audio_data)
+          bin_and_map(frequencies, amplitudes, num_bins)
 
-      frequencies, amplitudes = apply_fourier_transform(audio_data)
-      bin_and_map(frequencies, amplitudes, num_bins)
-      end_time = time.time()
-      processing_time = end_time - start_time
+          end_time = time.time()
+          processing_time = end_time - start_time
+          # if processing_time < chunk_duration:
+          #     chunk_duration = max(min_chunk_duration, chunk_duration - processing_time)
+          # else:
+          #     chunk_duration = min(max_chunk_duration, chunk_duration + processing_time)
       
+      print(f"Processing time: {processing_time} | Chunk duration: {chunk_duration}")
       time.sleep(chunk_duration)  # Wait for the duration of the audio chunk
       chunk_size = int(sample_rate * chunk_duration)
+  else:  # If filename is not provided, use the microphone
+      input_device_index, output_device_index, sample_rate, input_channels = select_audio_devices()
+      if input_device_index is not None and output_device_index is not None:
+          chunk_samples = int(chunk_duration * sample_rate)
+          print(f"Using {input_channels} input channels and {sample_rate} Hz sample rate.")
+          with sd.InputStream(device=input_device_index, channels=1, samplerate=sample_rate, callback=callback):
+              print("Press Ctrl+C to stop")
+              while True:
+                  pass
   # Remember to cleanup GPIO settings after use
 except KeyboardInterrupt:
     pass
