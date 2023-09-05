@@ -30,25 +30,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-  '-v', 
-  '--volume', 
-  type=int, 
-  help='Volume. Value from 0 - 100',
-  required=False,
-  choices=range(1, 101),
-  default=100
-)
-
-parser.add_argument(
-  '-t', 
-  '--time', 
-  type=float, 
-  help='Duration of chunk to read. Default is 16 ms',
-  required=False,
-  default=0.1
-)
-
-parser.add_argument(
   '-o', 
   '--output', 
   type=bool, 
@@ -59,11 +40,12 @@ parser.add_argument(
 args = parser.parse_args()
 
 filename=args.filename
+sample_rate = 32000
 
 # Function to control a motor and write data to a CSV file
-chunk_duration = args.time # 16 milliseconds
+chunk_duration = 0.016 # 16 milliseconds
 num_bins = args.bins
-executor = ThreadPoolExecutor(max_workers=50)
+executor = ThreadPoolExecutor(max_workers=10)
 
 pwms = []
 # Setup
@@ -78,9 +60,13 @@ for pin in motor_pins:
 
 #control motor
 def control_motor(motor_number, intensity):
+    if intensity > 1:
+        intensity = 1
     intensity = float(format(intensity * 100, ".0f"))
-    print(f"Motor {motor_number} vibration intensity {intensity}")
+    # print(f"Motor {motor_number} vibrating with intensity {intensity}")
     pwms[motor_number].ChangeDutyCycle(intensity)
+    time.sleep(0.1)  # Vibrate for 16 ms
+    pwms[motor_number].ChangeDutyCycle(0)  # Stop the vibration
 
 # Function to read audio data from a music file in chunks
 def read_audio_data(file_path, chunk_size):
@@ -106,25 +92,85 @@ def get_sample_rate_from_device(device_index):
 # Function to apply Fourier Transform and plot it
 def apply_fourier_transform(audio_data):
     amplitudes = np.abs(np.fft.rfft(audio_data))
-    frequencies = np.fft.rfftfreq(len(amplitudes), 1.0 / sample_rate)
+    frequencies = np.fft.rfftfreq(len(audio_data), 1.0 / sample_rate)
     return frequencies, amplitudes
 
-plot_thread = None  # Define plot_thread outside the function
-# Function to perform binning and map bins to motors
-def bin_and_map(frequencies, amplitudes, num_bins):
-    global plot_thread
-    bin_edges = np.linspace(frequencies.min(), frequencies.max(), num_bins + 1)
-    bins = np.digitize(frequencies, bin_edges)
-    threads = []
-    intensities = np.zeros(num_bins)  # Create an array to store the intensities
-    for i in range(num_bins):
-        indices = np.where(bins == i+1)[0]  # Get the indices of frequencies in this bin
-        bin_amplitudes = amplitudes[indices]  # Get the corresponding amplitudes
-        if bin_amplitudes.size > 0 and amplitudes.max() > 0:
-          intensity = bin_amplitudes.max() / amplitudes.max()
-          intensities[i] = intensity  # Store the intensity
-          executor.submit(control_motor, i, intensity)
+# Initialize variables
+running_means = np.zeros(num_bins)
+smoothing_factor = 0.03
+dynamic_ceiling = 0
+max_activation_count = 100  # Adjust as needed
+activation_counts = np.zeros(num_bins)
 
+# Function to update running mean
+def update_running_mean(bin, amplitude):
+    global running_means, activation_counts
+    activation_counts[bin] += 1
+    dynamic_smoothing_factor = smoothing_factor * max_activation_count / (activation_counts[bin] + max_activation_count)
+    running_means[bin] = (1 - dynamic_smoothing_factor) * running_means[bin] + dynamic_smoothing_factor * amplitude
+    print(f"Running means {running_means}")
+
+last_update_time = time.time()
+decay_rate = 0.97  # More aggressive decay
+max_ceiling = 100  # Upper limit
+reset_time = 1  # Time in seconds to reset the dynamic ceiling
+
+# Function to update dynamic ceiling
+def update_dynamic_ceiling(amplitude):
+    global dynamic_ceiling, last_update_time
+    start_time = time.time()
+
+    # print(f"amplitude: {amplitude}")
+
+    current_time = time.time()
+
+    # Decay the dynamic ceiling over time
+    time_diff = current_time - last_update_time
+    decay_factor = decay_rate ** time_diff
+    dynamic_ceiling *= decay_factor
+    
+    # Update the dynamic ceiling if a louder sound is encountered
+    dynamic_ceiling = max(min(max_ceiling, amplitude), dynamic_ceiling)
+    
+    # Reset the dynamic ceiling if no loud sound has been encountered for 'reset_time' seconds
+    if current_time - last_update_time > reset_time:
+        dynamic_ceiling = 0
+    
+    last_update_time = current_time
+
+    print(f"dynamic_ceiling: {dynamic_ceiling}")
+
+    end_time = time.time()
+    # print(f"Time taken for update_dynamic_ceiling: {end_time - start_time} seconds")
+
+# Modified bin_and_map function
+def bin_and_map(frequencies, amplitudes, num_bins):
+    global running_means, dynamic_ceiling
+    bin_edges = np.linspace(300, 7500, num_bins + 1)  # Frequency range of 300 to 7500 Hz
+    # bin_edges = np.linspace(frequencies.min(), frequencies.max(), num_bins + 1)  # Frequency range of 300 to 7500 Hz
+    bins = np.digitize(frequencies, bin_edges)
+    selected_bin = -1
+    max_amplitude = 0
+
+    for i in range(num_bins):
+        indices = np.where(bins == i+1)[0]
+        bin_amplitudes = amplitudes[indices]
+        # print(f"Running means: {running_means} seconds")
+        if bin_amplitudes.size > 0:
+            max_bin_amplitude = bin_amplitudes.max()
+            if max_bin_amplitude > running_means[i]:  # 20 dB SPL threshold
+                if max_bin_amplitude > max_amplitude:
+                    max_amplitude = max_bin_amplitude
+                    selected_bin = i
+    print(f"Selected bin: {selected_bin} bin")
+    
+    if selected_bin != -1:
+        update_running_mean(selected_bin, max_amplitude)
+        update_dynamic_ceiling(max_amplitude)
+        intensity = (max_amplitude - running_means[selected_bin]) / (dynamic_ceiling - running_means[selected_bin])
+        intensity = intensity ** 0.5  # Apply exponential scaling
+        motor_number = selected_bin  # Directly map the selected bin to a motor
+        executor.submit(control_motor, motor_number, intensity)  # Run control_motor on its own thread
 
 audio_queue = queue.Queue()
 # Function to play audio from the queue
@@ -134,14 +180,13 @@ def play_audio_from_queue():
         if audio_chunk is None:
             break
         try:
-            sd.play(audio_chunk, samplerate=sample_rate, blocksize=4096)
+            sd.play(audio_chunk, samplerate=sample_rate, blocksize=2048)
             sd.wait()
         except Exception as e:
             print(f"Audio playback error: {e}")
 
 audio_buffer = np.array([])
 buffer_lock = Lock()
-chunk_duration = 0.1  # 100 ms
 chunk_samples = None
 def callback(indata, frames, time, status):
     global audio_buffer
@@ -161,12 +206,6 @@ def callback(indata, frames, time, status):
         
         frequencies, amplitudes = apply_fourier_transform(audio_chunk)
         bin_and_map(frequencies, amplitudes, num_bins)
-
-
-
-
-min_chunk_duration = chunk_duration # Minimum chunk duration in seconds
-max_chunk_duration = 0.1
 
 def select_audio_devices():
     device_count = len(sd.query_devices())
@@ -196,10 +235,7 @@ def select_audio_devices():
 
     return input_device_index, output_device_index, input_sample_rate, input_channels
 
-
-
 # Main loop
-volume = args.volume # Set the volume to 100%
 try:
   # Start the audio playback thread
   audio_thread = Thread(target=play_audio_from_queue,)
@@ -211,7 +247,6 @@ try:
           start_time = time.time()
 
           audio_data = audio_chunk
-          audio_data = audio_data * (args.volume/100)  # Adjust the volume
 
           if args.output:
               audio_queue.put(audio_data)
@@ -221,14 +256,9 @@ try:
 
           end_time = time.time()
           processing_time = end_time - start_time
-          # if processing_time < chunk_duration:
-          #     chunk_duration = max(min_chunk_duration, chunk_duration - processing_time)
-          # else:
-          #     chunk_duration = min(max_chunk_duration, chunk_duration + processing_time)
-      
-      print(f"Processing time: {processing_time} | Chunk duration: {chunk_duration}")
-      time.sleep(chunk_duration)  # Wait for the duration of the audio chunk
-      chunk_size = int(sample_rate * chunk_duration)
+          
+          time.sleep(chunk_duration)  # Wait for the duration of the audio chunk
+          chunk_size = int(sample_rate * chunk_duration)
   else:  # If filename is not provided, use the microphone
       input_device_index, output_device_index, sample_rate, input_channels = select_audio_devices()
       if input_device_index is not None and output_device_index is not None:
@@ -237,6 +267,7 @@ try:
           with sd.InputStream(device=input_device_index, channels=1, samplerate=sample_rate, callback=callback):
               print("Press Ctrl+C to stop")
               while True:
+                  time.sleep(chunk_duration)
                   pass
   # Remember to cleanup GPIO settings after use
 except KeyboardInterrupt:
