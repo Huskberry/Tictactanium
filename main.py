@@ -50,7 +50,7 @@ executor = ThreadPoolExecutor(max_workers=10)
 pwms = []
 # Setup
 GPIO.setmode(GPIO.BCM)  # Use BCM numbering for GPIO pins
-motor_pins = [17, 22, 23, 27]  # Replace with your GPIO pin numbers
+motor_pins = [5,6,13,19]  # Replace with your GPIO pin numbers
 for pin in motor_pins:
     GPIO.setup(pin, GPIO.OUT)
     GPIO.output(pin, GPIO.LOW)
@@ -101,14 +101,28 @@ smoothing_factor = 0.03
 dynamic_ceiling = 0
 max_activation_count = 100  # Adjust as needed
 activation_counts = np.zeros(num_bins)
+last_update_time_means = np.zeros(num_bins)
 
 # Function to update running mean
 def update_running_mean(bin, amplitude):
-    global running_means, activation_counts
+    global running_means, activation_counts, last_update_time_means
     activation_counts[bin] += 1
     dynamic_smoothing_factor = smoothing_factor * max_activation_count / (activation_counts[bin] + max_activation_count)
+    
+    current_time = time.time()
+    
+    # Decay the running mean over time
+    time_diff = current_time - last_update_time_means[bin]
+    decay_factor = decay_rate ** time_diff
+    running_means[bin] *= decay_factor
+    
     running_means[bin] = (1 - dynamic_smoothing_factor) * running_means[bin] + dynamic_smoothing_factor * amplitude
+    
+    # Update the last update time for this bin
+    last_update_time_means[bin] = current_time
+    
     print(f"Running means {running_means}")
+
 
 last_update_time = time.time()
 decay_rate = 0.97  # More aggressive decay
@@ -162,7 +176,7 @@ def bin_and_map(frequencies, amplitudes, num_bins):
                 if max_bin_amplitude > max_amplitude:
                     max_amplitude = max_bin_amplitude
                     selected_bin = i
-    print(f"Selected bin: {selected_bin} bin")
+    # print(f"Selected bin: {selected_bin} bin")
     
     if selected_bin != -1:
         update_running_mean(selected_bin, max_amplitude)
