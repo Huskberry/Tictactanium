@@ -1,41 +1,97 @@
-# Vaibuu
-I've been working on a noninvasive haptic feedback device meant to be worn on the wrist. A simple technology for less < $100 (Raspberry Pi is the most expensive component here). It's most useful application is allow people with audio/visual impairments interact with the world.
+# Vaibuu: Haptic Feedback Device for the Audio-Visual Impaired
 
-This is a technology that can usher a new type of audience to the world.
+Vaibuu is a wrist-worn, noninvasive haptic feedback device designed to make the world more accessible for people with audio and visual impairments. With its cost-effective approach (less than $100), this technology has the potential to open up new avenues for an otherwise marginalized audience.
 
-VISUAL: The technology here is use Text to Speech (TTS) to allow a sort of dynamic and adaptable braille system. Imagine a person with blindness accessing @wikipedia, text books or a blog without expensive technology. I'm using [rhasspy/piper](https://github.com/rhasspy/piper) on to generate TTS. I take the text, convert it to a .WAV file (audio) then run the audio through a Fourier Transform algorithm to generate different frequencies and amplitudes, then pass that information to a PWM signal and to linear vibrating actuators (the tiny vibrators in your smartphone)
+---
 
-AUDIO: the technology here is to enable people with hearing impairments to have an auditory experience through controlled vibrations on the skin (wrist).
+## Table of Contents
+1. [Visual Application](#visual-application)
+2. [Audio Application](#audio-application)
+3. [Features](#features)
+4. [Technical Description](#technical-description)
+5. [Materials & Circuit Setup](#materials--circuit-setup)
+6. [Usage](#usage)
+7. [Project Status](#project-status)
+8. [License](#license)
+9. [Known Bugs](#known-bugs)
+10. [Contributions](#contributions)
 
-This is sensory substitution.
+---
 
-## Description
-Simply put, this code takes auditory information from the environment, passes 16ms chunks of it through a discrete Fourier Transform, bins the frequencies (depending on the number of vibration motors available; 4 being feasibly minimum) and vibrates those motors depending on the frequency's amplitude. The motors are linear resonant actuators (LRA) similar to those in smartphones..
+## Visual Application
 
-A motor will always vibrate within the same frequency band. For example, motor 1 will always vibrate at a frequency band between 300 - 900 Hz of sound. The frequency bands are actually not evenly distributed; rather logarithmically distributed. For human hearing, the next percievable and distinguishable frequency from 300 Hz is not really 600 Hz but 900 Hz.
+Vaibuu utilizes Text-to-Speech (TTS) technology, specifically the [rhasspy/piper](https://github.com/rhasspy/piper) library, to facilitate an adaptable Braille-like experience. It converts text to audio files and processes these through a Fourier Transform algorithm. The resulting frequencies and amplitudes are then translated into PWM signals which activate linear vibrating actuators—making webpages like Wikipedia, textbooks, or blogs accessible without the need for expensive technology.
 
-# Connection requirements and schematic
-## Materials Needed:
-4 Linear Resonant Actuators (LRAs) rated for 5V
-4 N-channel MOSFETs (compatible with 5V gate voltage)
-4 Diodes (for flyback protection)
-4 10kΩ resistors (for pull-down)
-Raspberry Pi
-Breadboard
-Jumper wires
-External 5V power supply
-## Circuit Setup:
-* Power Supply: Connect an external 5V power supply to the breadboard. Make sure to connect the ground of the Raspberry Pi to the ground of the external power supply.
-* MOSFETs: Place the 8 N-channel MOSFETs on the breadboard. Connect the source pin of each MOSFET to the ground rail on the breadboard.
-* LRAs: Connect one terminal of each LRA to the drain pin of a corresponding MOSFET. Connect the other terminal to the positive rail of the 5V power supply on the breadboard.
-* Diodes: Connect a diode in parallel with each LRA. The cathode (the side with the stripe) should be connected to the positive terminal of the LRA, and the anode should be connected to the drain of the corresponding MOSFET. This protects the MOSFET from back EMF.
-* Pull-down Resistors: Connect a 10kΩ resistor between the gate of each MOSFET and the ground. This ensures that the MOSFET remains off when the GPIO pin is not actively driving it.
-* GPIO to Gate: Connect a GPIO pin from the Raspberry Pi to the gate of each MOSFET. This will be used to control the MOSFET via PWM.
+---
 
-Since we are using GPIO as the bins, we should choose appropriate pins on the Raspberry Pi. 
+## Audio Application
 
-## PS
-I will be adding additional information to this project as time goes by. I hope by reading the code, for now, should provide an idea of what it does. Feel free to suggest improvements (To the documentation as well)
+For those with hearing impairments, Vaibuu enables a unique auditory experience through controlled skin vibrations on the wrist. In essence, this is a form of sensory substitution.
 
-## Known bugs
-As the code is running, I've noticed that the first 30 seconds or so have a somewhat consistent vibratory pattern on my wrist. After that, it dwindles. The ```dynamic_ceiling()``` and ```running_mean``` functions are the culprits here. Those two functions are means to regulate the noise from the environment. eg, a hum from a coffee machine in a restraurant may produce a high vibration once detected, then falls to a constant hum (which is undesirable); but as this is noise, the  algorithm should be able to detect that it doesn't have enough variation in frequency to classify as meaninfful sound. So that hum gets drowned out at the expense of the meaningful frequencies being a bit less 'feelable'.
+---
+
+## Features
+
+- **Affordable**: Cost under $100
+- **Accessible**: Designed for people with audio/visual impairments
+- **Adaptable**: Can be used for a variety of online resources
+- **Sensory Substitution**: Converts audio/visual information into tactile feedback
+
+---
+
+## Technical Description
+
+The core algorithm takes 16ms chunks of auditory information and applies a Discrete Fourier Transform (DFT) to them. Based on the number of available vibration motors (a minimum of 4 being feasible), the frequencies are binned. Each motor is then activated based on the amplitude of these frequencies. The frequency bands for the motors are not evenly but logarithmically distributed to better match human perception.
+
+For example, a motor that operates between a frequency band of 300 - 900 Hz will not have a noticeable next frequency at 600 Hz but rather at 900 Hz.
+
+---
+
+## Materials & Circuit Setup
+
+### Required Materials
+- 4 Linear Resonant Actuators (LRAs) rated for 5V
+- 4 N-channel MOSFETs (compatible with 5V gate voltage)
+- 4 Diodes (for flyback protection)
+- 4 10kΩ resistors (for pull-down)
+- Raspberry Pi
+- Breadboard
+- Jumper wires
+- External 5V power supply
+
+### Circuit Setup
+Detailed steps on setting up the circuit are provided. This includes information on the power supply, MOSFETs, LRAs, diodes, pull-down resistors, and GPIO connections.
+
+[See Full Setup](Setup.md)
+
+---
+
+## Usage
+
+Since we use the Raspberry Pi's GPIO pins, make sure to select appropriate pins for the setup.
+
+---
+
+## Project Status
+
+This document will be updated as the project progresses. For now, the code should provide an adequate understanding of the project's functionality. Your suggestions for improvements are most welcome.
+
+---
+
+## License
+
+This project is licensed under the MIT License. [See License](License.txt)
+
+---
+
+## Known Bugs
+
+The `dynamic_ceiling()` and `running_mean` functions can cause a consistent vibratory pattern for the first 30 seconds which then dwindles. This is part of the system's noise regulation which needs further refinement.
+
+---
+
+## Contributions
+
+Feel free to suggest improvements, both for the code and this documentation.
+
+---
