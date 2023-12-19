@@ -57,7 +57,7 @@ For example, a motor that operates between a frequency band of 300 - 900 Hz will
 - Raspberry Pi
 - Breadboard
 - Jumper wires
-- External 5V power supply
+- External 3.3V power supply
 
 ### Circuit Setup
 Detailed steps on setting up the circuit are provided. This includes information on the power supply, MOSFETs, LRAs, diodes, pull-down resistors, and GPIO connections.
