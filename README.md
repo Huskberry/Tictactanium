@@ -1,6 +1,6 @@
-# Tictactenium: Haptic Feedback Device for the Audio-Visual Impaired
+# Tictactanium: Haptic Feedback Device for the Audio-Visual Impaired
 
-Tictactenium is a wrist-worn, noninvasive haptic feedback device designed to make the world more accessible for people with audio and visual impairments. With its cost-effective approach (less than $100), this technology has the potential to open up new avenues for an otherwise marginalized audience.
+Tictactanium is a wrist-worn, noninvasive haptic feedback device designed to make the world more accessible for people with audio and visual impairments. With its cost-effective approach (less than $100), this technology has the potential to open up new avenues for an otherwise marginalized audience.
 
 
 ## Table of Contents
@@ -17,11 +17,11 @@ Tictactenium is a wrist-worn, noninvasive haptic feedback device designed to mak
 
 ## Visual Application
 
-Tictactenium utilizes Text-to-Speech (TTS) technology, specifically the [rhasspy/piper](https://github.com/rhasspy/piper) library, to facilitate an adaptable Braille-like experience. It converts text to audio files and processes these through a Fourier Transform algorithm. The resulting frequencies and amplitudes are then translated into PWM signals which activate linear vibrating actuators—making webpages like Wikipedia, textbooks, or blogs accessible without the need for expensive technology.
+Tictactanium utilizes Text-to-Speech (TTS) technology, specifically the [rhasspy/piper](https://github.com/rhasspy/piper) library, to facilitate an adaptable Braille-like experience. It converts text to audio files and processes these through a Fourier Transform algorithm. The resulting frequencies and amplitudes are then translated into PWM signals which activate linear vibrating actuators—making webpages like Wikipedia, textbooks, or blogs accessible without the need for expensive technology.
 
 ## Audio Application
 
-For those with hearing impairments, Tictactenium enables a unique auditory experience through controlled skin vibrations on the wrist. In essence, this is a form of sensory substitution.
+For those with hearing impairments, Tictactanium enables a unique auditory experience through controlled skin vibrations on the wrist. In essence, this is a form of sensory substitution.
 
 ## Features
 
