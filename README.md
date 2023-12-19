@@ -1,6 +1,6 @@
 # Tictactanium: Haptic Feedback Device for the Audio-Visual Impaired
 
-Tictactanium is a wrist-worn, noninvasive haptic feedback device designed to make the world more accessible for people with audio and visual impairments. With its cost-effective approach (less than $100), this technology has the potential to open up new avenues for an otherwise marginalized audience.
+Tictactanium is a wrist-worn or vest-based noninvasive haptic feedback device designed to make the world more accessible for people with audio and visual impairments. With its cost-effective approach (less than $100), this technology has the potential to open up new avenues for an otherwise marginalized audience.
 
 ## Etymology of The Name
 
