@@ -2,6 +2,17 @@
 
 Tictactanium is a wrist-worn, noninvasive haptic feedback device designed to make the world more accessible for people with audio and visual impairments. With its cost-effective approach (less than $100), this technology has the potential to open up new avenues for an otherwise marginalized audience.
 
+## Etymology of The Name
+
+**Tictactanium** is a portmanteau blending three distinct elements, each signifying a core aspect of the project's identity and purpose:
+
+1. **Tic** - Derived from the 'tick' of a clock, this part symbolizes the millisecond precision, almost imperceptible moments in time that our device aims to capture and respond to. It reflects our commitment to accuracy and responsiveness in delivering tactile sensations.
+
+2. **Tact** - Short for 'tactile', this segment represents the sense of touch. It is the essence of our project's goal: to create a bridge between the digital and physical worlds, allowing users to experience and interact with digital environments through touch.
+
+3. **Anium** - A nod to the nomenclature often used in the periodic table, it gives a scientific and elemental flavor to the name. It implies that this technology is fundamental, almost elemental, in its approach to enhancing human-computer interaction.
+
+Together, **Tictactanium** encompasses our vision of creating a haptic feedback device that is precise, tactile, and fundamentally innovative, offering an elemental change in how we interact with technology.
 
 ## Table of Contents
 1. [Visual Application](#visual-application)
