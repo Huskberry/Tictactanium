@@ -33,7 +33,7 @@ parser.add_argument(
   '-o', 
   '--output', 
   type=bool, 
-  help='Whether to output the sound',
+  help='Output the sound',
   required=False,
   default=False
 )
@@ -62,10 +62,10 @@ for pin in motor_pins:
 def control_motor(motor_number, intensity):
     if intensity > 1:
         intensity = 1
-    intensity = float(format(intensity * 100, ".0f"))
+    intensity = float(format(intensity * 255, ".0f"))
     # print(f"Motor {motor_number} vibrating with intensity {intensity}")
     pwms[motor_number].ChangeDutyCycle(intensity)
-    time.sleep(0.1)  # Vibrate for 16 ms
+    time.sleep(0.016)  # Vibrate for 16 ms
     pwms[motor_number].ChangeDutyCycle(0)  # Stop the vibration
 
 # Function to read audio data from a music file in chunks

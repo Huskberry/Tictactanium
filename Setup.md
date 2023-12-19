@@ -1,5 +1,5 @@
 # Circuit Setup:
-* Power Supply: Connect an external 5V power supply to the breadboard. Make sure to connect the ground of the Raspberry Pi to the ground of the external power supply.
+* Power Supply: Connect an external 3.3V power supply to the breadboard. Make sure to connect the ground of the Raspberry Pi to the ground of the external power supply.
 * MOSFETs: Place the 8 N-channel MOSFETs on the breadboard. Connect the source pin of each MOSFET to the ground rail on the breadboard.
 * LRAs: Connect one terminal of each LRA to the drain pin of a corresponding MOSFET. Connect the other terminal to the positive rail of the 5V power supply on the breadboard.
 * Diodes: Connect a diode in parallel with each LRA. The cathode (the side with the stripe) should be connected to the positive terminal of the LRA, and the anode should be connected to the drain of the corresponding MOSFET. This protects the MOSFET from back EMF.
