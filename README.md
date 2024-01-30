@@ -15,16 +15,18 @@ Tictactanium is a wrist-worn or vest-based noninvasive haptic feedback device de
 Together, **Tictactanium** encompasses our vision of creating a haptic feedback device that is precise, tactile, and fundamentally innovative, offering an elemental change in how we interact with technology.
 
 ## Table of Contents
+
 1. [Visual Application](#visual-application)
 2. [Audio Application](#audio-application)
 3. [Features](#features)
 4. [Technical Description](#technical-description)
-5. [Materials & Circuit Setup](#materials--circuit-setup)
-6. [Usage](#usage)
-7. [Project Status](#project-status)
-8. [License](#license)
-9. [Known Bugs](#known-bugs)
-10. [Contributions](#contributions)
+5. [Project Setup](#project-setup)
+6. [Materials & Circuit Setup](#materials--circuit-setup)
+7. [Usage](#usage)
+8. [Project Status](#project-status)
+9. [License](#license)
+10. [Known Bugs](#known-bugs)
+11. [Contributions](#contributions)
 
 ## Visual Application
 
@@ -47,9 +49,22 @@ The core algorithm takes 16ms chunks of auditory information and applies a Discr
 
 For example, a motor that operates between a frequency band of 300 - 900 Hz will not have a noticeable next frequency at 600 Hz but rather at 900 Hz.
 
+## Project setup
+
+```python3 -m venv .venv```
+
+where ```.venv``` is the name of the folder where the virtual environment will be stored.
+
+```source .venv/bin/activate```
+
+```pip install -r requirements.txt```
+
+```python3 main.py --bins 4 --filename "test.wav"```
+
 ## Materials & Circuit Setup
 
 ### Required Materials
+
 - 4 Linear Resonant Actuators (LRAs) rated for 5V
 - 4 N-channel MOSFETs (compatible with 5V gate voltage)
 - 4 Diodes (for flyback protection)
@@ -60,6 +75,7 @@ For example, a motor that operates between a frequency band of 300 - 900 Hz will
 - External 3.3V power supply
 
 ### Circuit Setup
+
 Detailed steps on setting up the circuit are provided. This includes information on the power supply, MOSFETs, LRAs, diodes, pull-down resistors, and GPIO connections.
 
 [See Full Setup](Setup.md)
